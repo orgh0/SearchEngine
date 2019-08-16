@@ -1,13 +1,13 @@
 import re
 import argparse
 from collections import *
+import tqdm as tqdm
 
 from utils import get_context, update_words
 
 index_categories = ['title', 'text', 'category', 'infobox']
-title_tags = open("./data/title_tags.txt", "w")
 
-pagination_val  = 1000
+pagination_val  = 10
 
 def make_index(iter_doc):
     num_pages = 0
@@ -17,8 +17,9 @@ def make_index(iter_doc):
     for cat in index_categories:
         index_dict[cat] = defaultdict(list)
     
-    for event, elem in iter_doc:
+    for event, elem in tqdm.tqdm(iter_doc):
         tag =  re.sub(r"{.*}", "", elem.tag)
+        # print("Tag:", tag)
         if event == "start":
             if tag == "page":
                 num_pages += 1
@@ -29,30 +30,33 @@ def make_index(iter_doc):
             if tag == "text":
                 text = elem.text
                 try:
-                    text = text.encode("utf-8")
-                    update_words(word_dict["text"], text)
-                except:
-                    pass
-                try:
                     categories = re.findall("\[\[Category:(.*?)\]\]", text)
                     update_words(word_dict["category"], categories)
+                
+                    infoboxes = re.findall("{{Infobox([\s\S]*)}}", text)
+                    update_words(word_dict["infobox"], infoboxes)
                 except:
                     pass
+
                 try:
-                    infoboxes = re.findall("{{Infobox(.*?)}}", text)
-                    update_words(word_dict["infobox"], text)
+                    text = text.lower()
+                    update_words(word_dict["text"], text, istext=True)
                 except:
                     pass
             if tag == "title":
                 text = elem.text
                 try:
-                    text = text.encode("utf-8")
+                    text = text.lower()
                     title = text+"\n"
-                    update_words(word_dict["title"], text)
+                    update_words(word_dict["title"], text, istext=True)
                 except:
                     pass
             if tag == "page":
                 index = "d"+str(num_pages)
+                print("Len of cat", len(word_dict["category"]))
+                print("Len of text", len(word_dict["text"]))
+                print("Len of title", len(word_dict["title"]))
+                print("Len of infobox", len(word_dict["infobox"]))
                 for key, value in word_dict.items():
                     for word in value:
                         s = index + "->" + str(value[word])
@@ -60,8 +64,8 @@ def make_index(iter_doc):
 
                 if num_pages % pagination_val == 0:
                     for key, value in index_dict.items():
-                        print(key)
-                        print(value)
+                        # print(key)
+                        # print(value)
                         file = "./output/"+key[0:2]+str(output_file_num)+".txt"
                         o = open(file, "w")
                         for word in sorted(value):
@@ -73,7 +77,8 @@ def make_index(iter_doc):
                     for key, val in index_dict.items():
                         index_dict[key].clear()
             elem.clear()
-     
+
+
 def main(data, output_dep_folder):
     iter_doc = get_context(data)
     make_index(iter_doc)
